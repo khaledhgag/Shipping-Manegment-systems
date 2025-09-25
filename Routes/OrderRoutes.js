@@ -1,0 +1,13 @@
+// تحديث OrderRoutes.js
+const express = require('express');
+const { createOrder, updateOrderStatus, getOrders, assignDriver } = require('../services/OrderService');
+const { authMiddleware, requireRole } = require('../Midlleware/authMiddleware');
+
+const router = express.Router();
+
+router.post('/', authMiddleware, requireRole(['employee', 'admin']), createOrder);
+router.put('/:id/status', authMiddleware, requireRole(['employee', 'admin']), updateOrderStatus);
+router.put('/:id/assign', authMiddleware, requireRole(['employee', 'admin']), assignDriver);
+router.get('/', authMiddleware, requireRole(['admin']), getOrders);
+
+module.exports = router;

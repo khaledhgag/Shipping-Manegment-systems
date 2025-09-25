@@ -1,0 +1,35 @@
+// DriverService.js
+const Driver = require('../models/Driver');
+
+exports.createDriver = async (req, res) => {
+  try {
+    const driver = new Driver(req.body);
+    await driver.save();
+    res.status(201).json({ message: 'Driver created', driver });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+exports.getDrivers = async (req, res) => {
+  try {
+    const drivers = await Driver.find();
+    res.json(drivers);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.updateDriverStatus = async (req, res) => {
+  try {
+    const driver = await Driver.findById(req.params.id);
+    if (!driver) return res.status(404).json({ error: 'Driver not found' });
+    
+    driver.availability = req.body.availability;
+    await driver.save();
+    
+    res.json({ message: 'Driver status updated', driver });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
