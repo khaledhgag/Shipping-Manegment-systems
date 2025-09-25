@@ -3,6 +3,9 @@ const dotenv = require("dotenv");
 const morgan = require("morgan");
 const bcrypt = require("bcryptjs");
 const User = require("./models/UserModel");
+const cors = require("cors");
+
+
 
 dotenv.config({ path: "config.env" });
 const dbconnection = require("./config/database");
@@ -12,9 +15,8 @@ const DriverRoutes = require("./Routes/DriveRoutes"); // ✅ إضافة مسار
 const PaymentRoutes = require("./Routes/PaymentRoutes");
 const ReportRoutes = require("./Routes/ReportRoutes");
 //express app
-const app = express();
-
-//midileware
+const app = express();//midileware
+app.use(cors());
 app.use(express.json());
 if (process.env.NODE_ENV === `development`) {
   app.use(morgan("dev"));
