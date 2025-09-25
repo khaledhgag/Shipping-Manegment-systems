@@ -61,3 +61,21 @@ exports.assignDriver = async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 };
+// services/OrderService.js
+exports.addTrackingUpdate = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    
+    order.tracking.push({
+      status: req.body.status,
+      location: req.body.location,
+      notes: req.body.notes
+    });
+    
+    await order.save();
+    res.json({ message: 'Tracking update added', order });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};

@@ -12,6 +12,12 @@ const orderSchema = new mongoose.Schema({
     enum: ['pending', 'assigned', 'in-transit', 'delivered', 'paid'],
     default: 'pending'
   },
+    tracking: [{
+    status: { type: String, required: true },
+    location: { type: String },
+    timestamp: { type: Date, default: Date.now },
+    notes: { type: String }
+  }],
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 }, { timestamps: true });
 
