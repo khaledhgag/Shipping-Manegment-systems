@@ -1,5 +1,5 @@
 // DriverService.js
-const Driver = require('../models/Driver');
+const Driver = require('../models/DriverModel');
 
 exports.createDriver = async (req, res) => {
   try {
@@ -31,5 +31,37 @@ exports.updateDriverStatus = async (req, res) => {
     res.json({ message: 'Driver status updated', driver });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+};
+// الحصول على سائق واحد
+exports.getDriver = async (req, res) => {
+  try {
+    const driver = await Driver.findById(req.params.id);
+    if (!driver) return res.status(404).json({ error: 'Driver not found' });
+    res.json(driver);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// تحديث بيانات سائق
+exports.updateDriver = async (req, res) => {
+  try {
+    const driver = await Driver.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!driver) return res.status(404).json({ error: 'Driver not found' });
+    res.json({ message: 'Driver updated', driver });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// حذف سائق
+exports.deleteDriver = async (req, res) => {
+  try {
+    const driver = await Driver.findByIdAndDelete(req.params.id);
+    if (!driver) return res.status(404).json({ error: 'Driver not found' });
+    res.json({ message: 'Driver deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };

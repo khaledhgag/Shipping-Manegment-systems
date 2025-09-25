@@ -8,6 +8,7 @@ dotenv.config({ path: "config.env" });
 const dbconnection = require("./config/database");
 const OrderRoutes = require("./Routes/OrderRoutes");
 const UserRoutes = require("./Routes/UserRoutes");
+const DriverRoutes = require("./Routes/DriveRoutes"); // ✅ إضافة مسارات السائقين
 
 //express app
 const app = express();
@@ -25,6 +26,7 @@ dbconnection();
 // MOUNT Routes
 app.use("/api/v1/Order", OrderRoutes);
 app.use("/api/v1/User", UserRoutes);
+app.use("/api/v1/Driver", DriverRoutes); // ✅ إضافة مسارات السائقين
 
 
 
@@ -32,5 +34,5 @@ const Port = process.env.Port || 8000;
 
 app.listen(Port, () => {
   console.log(`server is running in the ${Port}`);
- // ✅ call admin creator here
+
 });
