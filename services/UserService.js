@@ -73,3 +73,12 @@ exports.register = async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 };
+exports.getUserProfile = async (req, res) => {
+  try {
+    // req.user تم تعيينه في authMiddleware
+    const user = await User.findById(req.user._id).select('-password');
+    res.json({ user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

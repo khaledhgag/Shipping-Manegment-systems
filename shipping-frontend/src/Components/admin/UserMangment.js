@@ -1,3 +1,4 @@
+// src/components/admin/UserManagement.js
 import React, { useState, useEffect } from 'react';
 import {
   Table,
@@ -18,6 +19,9 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  CircularProgress,
+  Box,
+  Typography
 } from '@mui/material';
 import { Edit, Delete, Add } from '@mui/icons-material';
 import api from '../../Services/api';
@@ -26,27 +30,35 @@ function UserManagement() {
   const [users, setUsers] = useState([]);
   const [open, setOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('UserManagement: Component mounted, fetching users...');
     fetchUsers();
   }, []);
 
   const fetchUsers = async () => {
     try {
-      const response = await api.get('/User');
+      setLoading(true);
+      console.log('UserManagement: Fetching users...');
+      const response = await api.get('/users');
+      console.log('UserManagement: Users response:', response.status, response.data);
       setUsers(response.data);
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error('UserManagement: Error fetching users:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
-        await api.delete(`/User/${id}`);
+        console.log('UserManagement: Deleting user:', id);
+        await api.delete(`/users/${id}`);
         fetchUsers();
       } catch (error) {
-        console.error('Error deleting user:', error);
+        console.error('UserManagement: Error deleting user:', error);
       }
     }
   };
@@ -54,22 +66,39 @@ function UserManagement() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      if (currentUser) {
-        await api.put(`/User/${currentUser._id}`, currentUser);
-      } else {
-        await api.post('/User', currentUser);
-      }
+     if (currentUser && currentUser._id) {
+  // تحديث
+  console.log('UserManagement: Updating user:', currentUser._id);
+  await api.put(`/users/${currentUser._id}`, currentUser);
+} else {
+  // إنشاء
+  console.log('UserManagement: Creating new user');
+  await api.post('/users', currentUser);
+}
+
       setOpen(false);
       fetchUsers();
     } catch (error) {
-      console.error('Error saving user:', error);
+      console.error('UserManagement: Error saving user:', error);
     }
   };
 
+  console.log('UserManagement: Rendered, loading:', loading, 'users count:', users.length);
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
     <div>
+      <Typography variant="h4" gutterBottom>
+        User Management
+      </Typography>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <h2>User Management</h2>
         <Button
           variant="contained"
           startIcon={<Add />}

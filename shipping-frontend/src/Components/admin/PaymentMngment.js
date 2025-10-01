@@ -1,3 +1,4 @@
+// src/Components/admin/PaymentManagement.js
 import React, { useState, useEffect } from 'react';
 import {
   Table,
@@ -18,73 +19,96 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Chip,
 } from '@mui/material';
-import { Edit, Delete, Add } from '@mui/icons-material';
+import { Edit, Payment, CheckCircle, Cancel, HourglassEmpty } from '@mui/icons-material';
 import api from '../../Services/api';
 
 function PaymentManagement() {
-  const [payments, setPayments] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [currentPayment, setCurrentPayment] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [currentOrder, setCurrentOrder] = useState(null);
+  const [paymentStatus, setPaymentStatus] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchPayments();
     fetchOrders();
   }, []);
 
-  const fetchPayments = async () => {
-    try {
-      const response = await api.get('/Payment');
-      setPayments(response.data);
-    } catch (error) {
-      console.error('Error fetching payments:', error);
-    }
-  };
-
   const fetchOrders = async () => {
     try {
-      const response = await api.get('/Order');
+      setLoading(true);
+      const response = await api.get('/orders');
       setOrders(response.data);
+      setError('');
     } catch (error) {
       console.error('Error fetching orders:', error);
+      setError('Failed to fetch orders');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this payment?')) {
-      try {
-        await api.delete(`/Payment/${id}`);
-        fetchPayments();
-      } catch (error) {
-        console.error('Error deleting payment:', error);
-      }
-    }
-  };
-
-  const handleStatusChange = async (paymentId, status) => {
+  const handlePaymentStatusChange = async (orderId, status) => {
     try {
-      await api.put(`/Payment/${paymentId}/status`, { status });
-      fetchPayments();
+      await api.put(`/orders/${orderId}/payment`, { paymentStatus: status });
+      fetchOrders(); // Refresh the list
     } catch (error) {
-      console.error('Error updating status:', error);
+      console.error('Error updating payment status:', error);
+      setError('Failed to update payment status');
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleOpenDialog = (order) => {
+    setCurrentOrder(order);
+    setPaymentStatus(order.paymentStatus);
+    setOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setOpen(false);
+    setCurrentOrder(null);
+    setPaymentStatus('');
+  };
+
+  const handleSubmit = async () => {
+    if (!currentOrder) return;
+    
     try {
-      if (currentPayment) {
-        await api.put(`/Payment/${currentPayment._id}`, currentPayment);
-      } else {
-        await api.post('/Payment', currentPayment);
-      }
-      setOpen(false);
-      fetchPayments();
+      await api.put(`/orders/${currentOrder._id}/payment`, { paymentStatus });
+      fetchOrders();
+      handleCloseDialog();
     } catch (error) {
-      console.error('Error saving payment:', error);
+      console.error('Error updating payment:', error);
+      setError('Failed to update payment');
     }
   };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'paid':
+        return <CheckCircle color="success" />;
+      case 'failed':
+        return <Cancel color="error" />;
+      default:
+        return <HourglassEmpty color="warning" />;
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'paid':
+        return 'success';
+      case 'failed':
+        return 'error';
+      default:
+        return 'warning';
+    }
+  };
+
+  if (loading) return <div>Loading payments...</div>;
+  if (error) return <div>Error: {error}</div>;
 
   return (
     <div>
@@ -92,18 +116,10 @@ function PaymentManagement() {
         <h2>Payment Management</h2>
         <Button
           variant="contained"
-          startIcon={<Add />}
-          onClick={() => {
-            setCurrentPayment({ 
-              order: '', 
-              amount: '', 
-              method: 'cash', 
-              status: 'pending' 
-            });
-            setOpen(true);
-          }}
+          startIcon={<Payment />}
+          onClick={fetchOrders}
         >
-          Add Payment
+          Refresh
         </Button>
       </div>
 
@@ -111,40 +127,43 @@ function PaymentManagement() {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Order</TableCell>
+              <TableCell>Order Number</TableCell>
+              <TableCell>Customer</TableCell>
               <TableCell>Amount</TableCell>
-              <TableCell>Method</TableCell>
-              <TableCell>Status</TableCell>
+              <TableCell>Order Status</TableCell>
+              <TableCell>Payment Status</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {payments.map((payment) => (
-              <TableRow key={payment._id}>
-                <TableCell>{payment.order?.customerName || 'Unknown'}</TableCell>
-                <TableCell>${payment.amount}</TableCell>
-                <TableCell>{payment.method}</TableCell>
+            {orders.map((order) => (
+              <TableRow key={order._id}>
+                <TableCell>{order.orderNumber}</TableCell>
+                <TableCell>{order.customerName}</TableCell>
+                <TableCell>${order.price}</TableCell>
                 <TableCell>
-                  <FormControl fullWidth size="small">
-                    <Select
-                      value={payment.status}
-                      onChange={(e) => handleStatusChange(payment._id, e.target.value)}
-                    >
-                      <MenuItem value="pending">Pending</MenuItem>
-                      <MenuItem value="completed">Completed</MenuItem>
-                      <MenuItem value="failed">Failed</MenuItem>
-                    </Select>
-                  </FormControl>
+                  <Chip 
+                    icon={getStatusIcon(order.status)}
+                    label={order.status}
+                    color={getStatusColor(order.status)}
+                    size="small"
+                  />
                 </TableCell>
                 <TableCell>
-                  <IconButton onClick={() => {
-                    setCurrentPayment(payment);
-                    setOpen(true);
-                  }}>
+                  <Chip 
+                    icon={getStatusIcon(order.paymentStatus)}
+                    label={order.paymentStatus}
+                    color={getStatusColor(order.paymentStatus)}
+                    size="small"
+                  />
+                </TableCell>
+                <TableCell>
+                  <IconButton 
+                    onClick={() => handleOpenDialog(order)}
+                    color="primary"
+                    title="Update Payment"
+                  >
                     <Edit />
-                  </IconButton>
-                  <IconButton onClick={() => handleDelete(payment._id)}>
-                    <Delete />
                   </IconButton>
                 </TableCell>
               </TableRow>
@@ -153,64 +172,34 @@ function PaymentManagement() {
         </Table>
       </TableContainer>
 
-      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{currentPayment?._id ? 'Edit Payment' : 'Add New Payment'}</DialogTitle>
+      <Dialog open={open} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Update Payment Status</DialogTitle>
         <DialogContent>
-          <form onSubmit={handleSubmit}>
-            <FormControl fullWidth margin="normal">
-              <InputLabel>Order</InputLabel>
-              <Select
-                value={currentPayment?.order || ''}
-                onChange={(e) => setCurrentPayment({...currentPayment, order: e.target.value})}
-                label="Order"
-                required
-              >
-                {orders.map((order) => (
-                  <MenuItem key={order._id} value={order._id}>
-                    {order.customerName} - {order.from} to {order.to}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Amount"
-              type="number"
-              value={currentPayment?.amount || ''}
-              onChange={(e) => setCurrentPayment({...currentPayment, amount: e.target.value})}
-            />
-            <FormControl fullWidth margin="normal">
-              <InputLabel>Method</InputLabel>
-              <Select
-                value={currentPayment?.method || 'cash'}
-                onChange={(e) => setCurrentPayment({...currentPayment, method: e.target.value})}
-                label="Method"
-              >
-                <MenuItem value="cash">Cash</MenuItem>
-                <MenuItem value="credit_card">Credit Card</MenuItem>
-                <MenuItem value="paypal">PayPal</MenuItem>
-              </Select>
-            </FormControl>
-            <FormControl fullWidth margin="normal">
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={currentPayment?.status || 'pending'}
-                onChange={(e) => setCurrentPayment({...currentPayment, status: e.target.value})}
-                label="Status"
-              >
-                <MenuItem value="pending">Pending</MenuItem>
-                <MenuItem value="completed">Completed</MenuItem>
-                <MenuItem value="failed">Failed</MenuItem>
-              </Select>
-            </FormControl>
-          </form>
+          {currentOrder && (
+            <div>
+              <h3>Order: {currentOrder.orderNumber}</h3>
+              <p>Customer: {currentOrder.customerName}</p>
+              <p>Amount: ${currentOrder.price}</p>
+              
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Payment Status</InputLabel>
+                <Select
+                  value={paymentStatus}
+                  onChange={(e) => setPaymentStatus(e.target.value)}
+                  label="Payment Status"
+                >
+                  <MenuItem value="pending">Pending</MenuItem>
+                  <MenuItem value="paid">Paid</MenuItem>
+                  <MenuItem value="failed">Failed</MenuItem>
+                </Select>
+              </FormControl>
+            </div>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancel</Button>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
           <Button onClick={handleSubmit} variant="contained">
-            {currentPayment?._id ? 'Update' : 'Create'}
+            Update
           </Button>
         </DialogActions>
       </Dialog>

@@ -1,31 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Button,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-} from '@mui/material';
-import { Edit, Delete, Add } from '@mui/icons-material';
 import api from '../../Services/api';
 
-function DriverManagement() {
+const DriverManagement = () => {
   const [drivers, setDrivers] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [currentDriver, setCurrentDriver] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newDriver, setNewDriver] = useState({
+    name: '',
+    phone: '',
+    vehicle: '',
+    availability: 'available',
+  });
 
   useEffect(() => {
     fetchDrivers();
@@ -33,141 +19,187 @@ function DriverManagement() {
 
   const fetchDrivers = async () => {
     try {
-      const response = await api.get('/Driver');
+      const response = await api.get('/drivers');
       setDrivers(response.data);
-    } catch (error) {
-      console.error('Error fetching drivers:', error);
+    } catch (err) {
+      setError(err.response?.data?.error || 'فشل في جلب السائقين');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this driver?')) {
-      try {
-        await api.delete(`/Driver/${id}`);
-        fetchDrivers();
-      } catch (error) {
-        console.error('Error deleting driver:', error);
-      }
-    }
-  };
-
-  const handleSubmit = async (e) => {
+  const handleAddDriver = async (e) => {
     e.preventDefault();
     try {
-      if (currentDriver) {
-        await api.put(`/Driver/${currentDriver._id}`, currentDriver);
-      } else {
-        await api.post('/Driver', currentDriver);
-      }
-      setOpen(false);
-      fetchDrivers();
-    } catch (error) {
-      console.error('Error saving driver:', error);
+      const response = await api.post('/drivers', newDriver);
+      setDrivers([...drivers, response.data.driver]);
+      setNewDriver({
+        name: '',
+        phone: '',
+        vehicle: '',
+        availability: 'available',
+      });
+      setShowAddForm(false);
+    } catch (err) {
+      setError(err.response?.data?.error || 'فشل في إضافة السائق');
     }
   };
 
+  const updateDriverStatus = async (driverId, status) => {
+    try {
+      await api.put(`/drivers/${driverId}/status`, { availability: status });
+      setDrivers(
+        drivers.map((driver) =>
+          driver._id === driverId ? { ...driver, availability: status } : driver
+        )
+      );
+    } catch (err) {
+      setError(err.response?.data?.error || 'فشل في تحديث حالة السائق');
+    }
+  };
+
+  const deleteDriver = async (driverId) => {
+    if (window.confirm('هل أنت متأكد من حذف هذا السائق؟')) {
+      try {
+        await api.delete(`/drivers/${driverId}`);
+        setDrivers(drivers.filter((driver) => driver._id !== driverId));
+      } catch (err) {
+        setError(err.response?.data?.error || 'فشل في حذف السائق');
+      }
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setNewDriver({
+      ...newDriver,
+      [name]: value,
+    });
+  };
+
+  if (loading) return <div className="loading">جاري التحميل...</div>;
+  if (error) return <div className="error">{error}</div>;
+
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <h2>Driver Management</h2>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => {
-            setCurrentDriver({ name: '', phone: '', vehicle: '', availability: 'available' });
-            setOpen(true);
-          }}
-        >
-          Add Driver
-        </Button>
-      </div>
+    <div className="driver-management">
+      <h1>إدارة السائقين</h1>
+      <button
+        className="btn btn-add"
+        onClick={() => setShowAddForm(!showAddForm)}
+      >
+        {showAddForm ? 'إلغاء' : 'إضافة سائق'}
+      </button>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Phone</TableCell>
-              <TableCell>Vehicle</TableCell>
-              <TableCell>Availability</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {drivers.map((driver) => (
-              <TableRow key={driver._id}>
-                <TableCell>{driver.name}</TableCell>
-                <TableCell>{driver.phone}</TableCell>
-                <TableCell>{driver.vehicle}</TableCell>
-                <TableCell>{driver.availability}</TableCell>
-                <TableCell>
-                  <IconButton onClick={() => {
-                    setCurrentDriver(driver);
-                    setOpen(true);
-                  }}>
-                    <Edit />
-                  </IconButton>
-                  <IconButton onClick={() => handleDelete(driver._id)}>
-                    <Delete />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{currentDriver?._id ? 'Edit Driver' : 'Add New Driver'}</DialogTitle>
-        <DialogContent>
-          <form onSubmit={handleSubmit}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Name"
-              value={currentDriver?.name || ''}
-              onChange={(e) => setCurrentDriver({...currentDriver, name: e.target.value})}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Phone"
-              value={currentDriver?.phone || ''}
-              onChange={(e) => setCurrentDriver({...currentDriver, phone: e.target.value})}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Vehicle"
-              value={currentDriver?.vehicle || ''}
-              onChange={(e) => setCurrentDriver({...currentDriver, vehicle: e.target.value})}
-            />
-            <FormControl fullWidth margin="normal">
-              <InputLabel>Availability</InputLabel>
-              <Select
-                value={currentDriver?.availability || 'available'}
-                onChange={(e) => setCurrentDriver({...currentDriver, availability: e.target.value})}
-                label="Availability"
+      {showAddForm && (
+        <div className="add-form">
+          <h2>إضافة سائق جديد</h2>
+          <form onSubmit={handleAddDriver}>
+            <div className="form-group">
+              <label htmlFor="name">الاسم</label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={newDriver.name}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="phone">رقم الهاتف</label>
+              <input
+                type="text"
+                id="phone"
+                name="phone"
+                value={newDriver.phone}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="vehicle">المركبة</label>
+              <input
+                type="text"
+                id="vehicle"
+                name="vehicle"
+                value={newDriver.vehicle}
+                onChange={handleInputChange}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="availability">الحالة</label>
+              <select
+                id="availability"
+                name="availability"
+                value={newDriver.availability}
+                onChange={handleInputChange}
               >
-                <MenuItem value="available">Available</MenuItem>
-                <MenuItem value="busy">Busy</MenuItem>
-                <MenuItem value="off">Off</MenuItem>
-              </Select>
-            </FormControl>
+                <option value="available">متاح</option>
+                <option value="busy">مشغول</option>
+                <option value="off">خارج الخدمة</option>
+              </select>
+            </div>
+            <button type="submit" className="btn btn-primary">
+              إضافة
+            </button>
           </form>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained">
-            {currentDriver?._id ? 'Update' : 'Create'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        </div>
+      )}
+
+      <div className="table-container">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>الاسم</th>
+              <th>رقم الهاتف</th>
+              <th>المركبة</th>
+              <th>الحالة</th>
+              <th>الإجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {drivers.map((driver) => (
+              <tr key={driver._id}>
+                <td>{driver.name}</td>
+                <td>{driver.phone}</td>
+                <td>{driver.vehicle}</td>
+                <td>
+                  <span className={`status status-${driver.availability}`}>
+                    {driver.availability === 'available'
+                      ? 'متاح'
+                      : driver.availability === 'busy'
+                      ? 'مشغول'
+                      : 'خارج الخدمة'}
+                  </span>
+                </td>
+                <td>
+                  <div className="actions">
+                    <select
+                      value={driver.availability}
+                      onChange={(e) =>
+                        updateDriverStatus(driver._id, e.target.value)
+                      }
+                      className="status-select"
+                    >
+                      <option value="available">متاح</option>
+                      <option value="busy">مشغول</option>
+                      <option value="off">خارج الخدمة</option>
+                    </select>
+                    <button
+                      className="btn btn-delete"
+                      onClick={() => deleteDriver(driver._id)}
+                    >
+                      حذف
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
-}
+};
 
 export default DriverManagement;

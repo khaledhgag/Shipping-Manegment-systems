@@ -34,3 +34,12 @@ exports.getPayments = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+exports.updatePayment = async (req, res) => {
+  try {
+    const payment = await Payment.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!payment) return res.status(404).json({ error: 'Payment not found' });
+    res.json({ message: 'Payment updated', payment });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};

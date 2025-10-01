@@ -16,8 +16,7 @@ const PaymentRoutes = require("./Routes/PaymentRoutes");
 const ReportRoutes = require("./Routes/ReportRoutes");
 //express app
 const app = express();//midileware
-app.use(cors());
-app.use(express.json());
+app.use(cors({ origin: "http://localhost:3000", credentials: true }));app.use(express.json());
 if (process.env.NODE_ENV === `development`) {
   app.use(morgan("dev"));
   console.log(`the mode is ${process.env.NODE_ENV}`);
@@ -27,11 +26,11 @@ if (process.env.NODE_ENV === `development`) {
 dbconnection();
 
 // MOUNT Routes
-app.use("/api/v1/Order", OrderRoutes);
-app.use("/api/v1/User", UserRoutes);
-app.use("/api/v1/Driver", DriverRoutes); // ✅ إضافة مسارات السائقين
-app.use("/api/v1/Payment", PaymentRoutes);
-app.use("/api/v1/Report", ReportRoutes);
+app.use("/api/v1/orders", OrderRoutes);
+app.use("/api/v1/users", UserRoutes);
+app.use("/api/v1/drivers", DriverRoutes); // ✅ إضافة مسارات السائقين
+app.use("/api/v1/payments", PaymentRoutes);
+app.use("/api/v1/reports", ReportRoutes);
 
 
 const Port = process.env.Port || 8000;

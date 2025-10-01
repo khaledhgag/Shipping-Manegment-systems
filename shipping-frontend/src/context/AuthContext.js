@@ -1,65 +1,45 @@
-// src/context/AuthContext.js
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import api from '../Services/api';
+import { authService } from '../Services/authService';
 
 const AuthContext = createContext();
 
-export function useAuth() {
+export const useAuth = () => {
   return useContext(AuthContext);
-}
+};
 
-export function AuthProvider({ children }) {
+export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      api.get('/User/profile')
-        .then(response => {
-          setCurrentUser(response.data.user);
-        })
-        .catch(() => {
-          localStorage.removeItem('token');
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
+    const user = authService.getCurrentUser();
+    if (user) {
+      setCurrentUser(user);
     }
+    setLoading(false);
   }, []);
 
   const login = async (email, password) => {
-    const response = await api.post('/User/login', { email, password });
-    const { token, user } = response.data;
-    localStorage.setItem('token', token);
-    setCurrentUser(user);
-    return user;
-  };
-
-  const register = async (name, email, password, role) => {
-    const response = await api.post('/User/register', { name, email, password, role });
-    const { token, user } = response.data;
-    localStorage.setItem('token', token);
-    setCurrentUser(user);
-    return user;
+    const data = await authService.login(email, password);
+    setCurrentUser(data.user);
+    return data;
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    authService.logout();
     setCurrentUser(null);
   };
 
   const value = {
     currentUser,
     login,
-    register,
     logout,
-    loading
+    isAuthenticated: authService.isAuthenticated,
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
-}
+};

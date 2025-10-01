@@ -1,10 +1,8 @@
-// src/components/common/Header.js
 import React from 'react';
-import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material';
-import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
-function Header() {
+const Header = () => {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -14,24 +12,17 @@ function Header() {
   };
 
   return (
-    <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
-      <Toolbar>
-        <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-          Shipping System
-        </Typography>
-        {currentUser && (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography variant="body1" sx={{ mr: 2 }}>
-              Welcome, {currentUser.name} ({currentUser.role})
-            </Typography>
-            <Button color="inherit" onClick={handleLogout}>
-              Logout
-            </Button>
-          </Box>
-        )}
-      </Toolbar>
-    </AppBar>
+    <header className="header">
+      <div className="logo">نظام إدارة التوصيل</div>
+      <div className="user-info">
+        <span>مرحباً، {currentUser?.name}</span>
+        <span>({currentUser?.role})</span>
+        <button onClick={handleLogout} className="btn btn-logout">
+          تسجيل الخروج
+        </button>
+      </div>
+    </header>
   );
-}
+};
 
 export default Header;
