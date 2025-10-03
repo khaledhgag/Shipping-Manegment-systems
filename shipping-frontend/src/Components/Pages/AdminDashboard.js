@@ -10,6 +10,7 @@ const AdminDashboard = () => {
     { path: '/admin/dashboard/drivers', label: 'إدارة السائقين' },
     { path: '/admin/dashboard/orders', label: 'إدارة الطلبات' },
     { path: '/admin/dashboard/payments', label: 'إدارة المدفوعات' },
+    { path: '/admin/dashboard/customers', label: 'إدارة العملاء' },
     { path: '/admin/dashboard/reports', label: 'التقارير' },
   ];
 

@@ -3,6 +3,8 @@ const Order = require('../models/Order');
 const Driver = require('../models/DriverModel');
 const User = require('../models/UserModel');
 const Payment = require('../models/PaymentModel');
+const Customer = require('../models/CustomerModel');
+
 
 // 📦 Orders Report
 exports.getOrdersReport = async (req, res) => {
@@ -160,6 +162,103 @@ exports.getRevenueReport = async (req, res) => {
     ]);
 
     res.json(revenue);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+// 🧑‍💼 Customers Report
+exports.getCustomersReport = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const match = {};
+
+    if (startDate && endDate) {
+      match.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+
+    const customers = await Customer.aggregate([
+      { $match: match },
+      {
+        $lookup: {
+          from: 'orders',
+          localField: '_id',
+          foreignField: 'senderCustomer',
+          as: 'orders'
+        }
+      },
+      {
+        $project: {
+          name: 1,
+          phone: 1,
+          email: 1,
+          totalOrders: { $size: '$orders' },
+          totalValue: { $sum: '$orders.price' },
+          // pendingPayments: مجموع أسعار الطلبات التي paymentStatus === 'pending'
+          pendingPayments: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: '$orders',
+                    as: 'o',
+                    cond: { $eq: ['$$o.paymentStatus', 'pending'] }
+                  }
+                },
+                as: 'p',
+                in: '$$p.price'
+              }
+            }
+          },
+          // returnedOrders: عدد الطلبات المرتجعة
+          returnedOrders: {
+            $size: {
+              $filter: {
+                input: '$orders',
+                as: 'o',
+                cond: { $eq: ['$$o.status', 'returned'] }
+              }
+            }
+          },
+          createdAt: 1
+        }
+      },
+      {
+        $sort: { totalOrders: -1 }
+      }
+    ]);
+
+    res.json(customers);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// 📊 Customers with Pending Payments Report
+exports.getPendingPaymentsReport = async (req, res) => {
+  try {
+    const customers = await Customer.find({ pendingPayments: { $gt: 0 } })
+      .populate('createdBy', 'name')
+      .sort({ pendingPayments: -1 });
+    
+    res.json(customers);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// 📦 Returned Orders Report
+exports.getReturnedOrdersReport = async (req, res) => {
+  try {
+    const orders = await Order.find({ status: 'returned' })
+      .populate('senderCustomer', 'name phone')
+      .populate('assignedDriver', 'name')
+      .populate('createdBy', 'name')
+      .sort({ updatedAt: -1 });
+    
+    res.json(orders);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

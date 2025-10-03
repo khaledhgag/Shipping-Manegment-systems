@@ -13,6 +13,7 @@ const OrderManagement = () => {
   const [showForm, setShowForm] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [drivers, setDrivers] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [filters, setFilters] = useState({ status: '', driverId: '', date: '' });
   const [trackingForm, setTrackingForm] = useState({ status: '', location: '', notes: '' });
   const [statusUpdate, setStatusUpdate] = useState('');
@@ -21,32 +22,41 @@ const OrderManagement = () => {
   const [formData, setFormData] = useState({
     customerName: '',
     customerPhone: '',
+    receiverName: '',
+    receiverPhone: '',
     from: '',
     to: '',
     productDetails: '',
     pieces: '',
     weight: '',
+    productPrice: '',
+    shippingCost: '',
     price: '',
     driverId: '',
+    senderCustomerId: ''
   });
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         if (id) {
-          const [orderRes, driversRes] = await Promise.all([
+          const [orderRes, driversRes, customersRes] = await Promise.all([
             api.get(`/orders/${id}`),
             api.get('/drivers/all'),
+            api.get('/customers')
           ]);
           setOrder(orderRes.data);
           setDrivers(driversRes.data);
+          setCustomers(customersRes.data);
         } else {
-          const [ordersRes, driversRes] = await Promise.all([
+          const [ordersRes, driversRes, customersRes] = await Promise.all([
             api.get('/orders', { params: filters }),
             api.get('/drivers/all'),
+            api.get('/customers')
           ]);
           setOrders(ordersRes.data);
           setDrivers(driversRes.data);
+          setCustomers(customersRes.data);
         }
       } catch (err) {
         setError(err.response?.data?.error || 'فشل في جلب البيانات');
@@ -60,22 +70,42 @@ const OrderManagement = () => {
   const handleSubmitOrder = async (e) => {
     e.preventDefault();
     try {
+      // Normalize payload: backend expects `senderCustomer` not `senderCustomerId`
+      const payload = {
+        ...formData,
+        ...(formData.senderCustomerId
+          ? { senderCustomer: formData.senderCustomerId }
+          : {})
+      };
+
+      // احسب السعر الإجمالي من حقول المنتج والشحن إن وُجدت
+      const product = Number(payload.productPrice || 0);
+      const shipping = Number(payload.shippingCost || 0);
+      if (!isNaN(product) || !isNaN(shipping)) {
+        payload.price = product + shipping;
+      }
+
       if (editMode) {
-        await api.put(`/orders/${formData._id}`, formData);
+        await api.put(`/orders/${formData._id}`, payload);
       } else {
-        await api.post('/orders', formData);
+        await api.post('/orders', payload);
       }
       
       setFormData({
         customerName: '',
         customerPhone: '',
+        receiverName: '',
+        receiverPhone: '',
         from: '',
         to: '',
         productDetails: '',
         pieces: '',
         weight: '',
+        productPrice: '',
+        shippingCost: '',
         price: '',
         driverId: '',
+        senderCustomerId: ''
       });
       setShowForm(false);
       setEditMode(false);
@@ -110,6 +140,108 @@ const OrderManagement = () => {
     }
   };
 
+  // Generate and print waybill for an order
+  const printWaybill = (o) => {
+    const orderData = o || order;
+    if (!orderData) return;
+    const sender = orderData.senderCustomer || { name: orderData.customerName, phone: orderData.customerPhone, address: orderData.from };
+    const receiver = { name: orderData.receiverName, phone: orderData.receiverPhone };
+    const price = orderData.price || 0;
+    const weight = orderData.weight || '-';
+    const details = orderData.productDetails || '-';
+    const orderNumber = orderData.orderNumber || orderData._id;
+
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(orderNumber)}`;
+    const logoUrl = '/logo512.png';
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Waybill ${orderNumber}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 16px; }
+    .waybill { width: 800px; margin: 0 auto; border: 2px solid #222; padding: 16px; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #999; padding-bottom: 12px; margin-bottom: 12px; }
+    .header .left { display: flex; align-items: center; gap: 12px; }
+    .logo { width: 60px; height: 60px; object-fit: contain; }
+    .title { font-size: 20px; font-weight: bold; }
+    .order-num { font-size: 16px; color: #333; }
+    .row { display: flex; gap: 16px; margin-bottom: 12px; }
+    .col { flex: 1; border: 1px solid #ddd; padding: 12px; }
+    .label { font-weight: bold; color: #555; display:block; margin-bottom: 6px; }
+    .val { color: #111; }
+    .barcode { display: flex; align-items: center; gap: 12px; }
+    .footer { margin-top: 12px; border-top: 1px dashed #999; padding-top: 12px; display:flex; justify-content: space-between; align-items:center; }
+    .small { font-size: 12px; color: #666; }
+    @media print { body { margin: 0; } .waybill { border: none; } }
+  </style>
+ </head>
+ <body>
+  <div class="waybill">
+    <div class="header">
+      <div class="left">
+        <img class="logo" src="${logoUrl}" alt="Company" />
+        <div>
+          <div class="title">Top Speed Shipping</div>
+          <div class="order-num">Order #: ${orderNumber}</div>
+        </div>
+      </div>
+      <div class="barcode">
+        <img src="${qrUrl}" alt="QR" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <span class="label">الراسل</span>
+        <div class="val">${sender?.name || '-'}</div>
+        <div class="small">Phone: ${sender?.phone || '-'}</div>
+      </div>
+      <div class="col">
+        <span class="label">المستلم</span>
+        <div class="val">${receiver?.name || '-'}</div>
+        <div class="small">Phone: ${receiver?.phone || '-'}</div>
+        <div class="small">Address: ${receiver?.address || '-'}</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <span class="label">Shipment Details</span>
+        <div class="small">Price: ${price} EG</div>
+        <div class="small">Weight: ${weight}</div>
+        <div class="small">Notes: ${details}</div>
+      </div>
+      <div class="col">
+        <span class="label">العنوان</span>
+        <div class="small">من: ${orderData.from || '-'}</div>
+        <div class="small">الي: ${orderData.to || '-'}</div>
+        <div class="small">Created: ${new Date(orderData.createdAt).toLocaleString()}</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="small">Please attach this label visibly on the parcel</div>
+      <div class="small">Thank you for shipping with us</div>
+    </div>
+  </div>
+  <script>
+    window.onload = function() { window.print(); setTimeout(() => window.close(), 300); };
+  </script>
+ </body>
+ </html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  };
+
   const handleUpdateStatus = async () => {
     try {
       await api.put(`/orders/${id}/status`, { status: statusUpdate });
@@ -129,6 +261,29 @@ const OrderManagement = () => {
       setPaymentUpdate('');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to update payment');
+    }
+  };
+
+  // Add function to handle customer selection
+  const handleCustomerSelect = (e) => {
+    const customerId = e.target.value;
+    if (customerId) {
+      const customer = customers.find(c => c._id === customerId);
+      if (customer) {
+        setFormData({
+          ...formData,
+          senderCustomerId: customerId,
+          customerName: customer.name,
+          customerPhone: customer.phone
+        });
+      }
+    } else {
+      setFormData({
+        ...formData,
+        senderCustomerId: '',
+        customerName: '',
+        customerPhone: ''
+      });
     }
   };
 
@@ -166,6 +321,7 @@ const OrderManagement = () => {
                 {order.status === 'delivered' && <i className="fas fa-check-circle"></i>}
                 {order.status === 'paid' && <i className="fas fa-money-bill-wave"></i>}
                 {order.status === 'cancelled' && <i className="fas fa-times-circle"></i>}
+                {order.status === 'returned' && <i className="fas fa-undo"></i>}
               </div>
               <div className="status-info">
                 <div className="status-label">حالة الشحن</div>
@@ -194,6 +350,17 @@ const OrderManagement = () => {
                 <div className="status-value">{order.price} EG</div>
               </div>
             </div>
+          {order.paymentStatus === 'paid' && (
+            <div className="status-card">
+              <div className="status-icon">
+                <i className="fas fa-dollar-sign"></i>
+              </div>
+              <div className="status-info">
+                <div className="status-label">مدفوع للعميل</div>
+                <div className="status-value">{order.senderPayoutAmount || 0} EG</div>
+              </div>
+            </div>
+          )}
           </div>
 
           {/* Order Information */}
@@ -221,26 +388,56 @@ const OrderManagement = () => {
 
           {/* Customer Information */}
           <div className="detail-section">
-            <h2><i className="fas fa-user"></i> معلومات العميل</h2>
-            <div className="customer-card">
-              <div className="customer-info">
-                <div className="customer-name">{order.customerName}</div>
-                <div className="customer-phone">
-                  <i className="fas fa-phone"></i> {order.customerPhone}
+            <h2><i className="fas fa-user"></i> معلومات العملاء</h2>
+            
+            {order.senderCustomer ? (
+              <div className="customer-card">
+                <div className="customer-header">
+                  <div className="customer-title">عميل الشحن</div>
+                  <div className="customer-name">{order.senderCustomer.name}</div>
+                  <div className="customer-phone">
+                    <i className="fas fa-phone"></i> {order.senderCustomer.phone}
+                  </div>
+                  {order.senderCustomer.email && (
+                    <div className="customer-email">
+                      <i className="fas fa-envelope"></i> {order.senderCustomer.email}
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="route-info">
-                <div className="route-item">
-                  <div className="route-label">من:</div>
-                  <div className="route-value">{order.from}</div>
+            ) : (
+              <div className="customer-card">
+                <div className="customer-header">
+                  <div className="customer-title">عميل الشحن</div>
+                  <div className="customer-name">{order.customerName}</div>
+                  <div className="customer-phone">
+                    <i className="fas fa-phone"></i> {order.customerPhone}
+                  </div>
                 </div>
-                <div className="route-arrow">
-                  <i className="fas fa-long-arrow-alt-left"></i>
+              </div>
+            )}
+            
+            <div className="customer-card">
+              <div className="customer-header">
+                <div className="customer-title">عميل الاستلام</div>
+                <div className="customer-name">{order.receiverName}</div>
+                <div className="customer-phone">
+                  <i className="fas fa-phone"></i> {order.receiverPhone}
                 </div>
-                <div className="route-item">
-                  <div className="route-label">إلى:</div>
-                  <div className="route-value">{order.to}</div>
-                </div>
+              </div>
+            </div>
+            
+            <div className="route-info">
+              <div className="route-item">
+                <div className="route-label">من:</div>
+                <div className="route-value">{order.from}</div>
+              </div>
+              <div className="route-arrow">
+                <i className="fas fa-long-arrow-alt-left"></i>
+              </div>
+              <div className="route-item">
+                <div className="route-label">إلى:</div>
+                <div className="route-value">{order.to}</div>
               </div>
             </div>
           </div>
@@ -337,6 +534,7 @@ const OrderManagement = () => {
                     <option value="delivered">تم التسليم</option>
                     <option value="paid">مدفوع</option>
                     <option value="cancelled">ملغي</option>
+                    <option value="returned">مرتجع</option>
                   </select>
                   <button 
                     className="btn btn-update" 
@@ -369,6 +567,35 @@ const OrderManagement = () => {
                   </button>
                 </div>
               </div>
+              {order.paymentStatus === 'paid' && (
+                <div className="update-group">
+                  <label>دفع للعميل:</label>
+                  <div className="update-input-group">
+                    <input
+                      type="number"
+                      placeholder="المبلغ"
+                      value={paymentUpdate}
+                      onChange={(e) => setPaymentUpdate(e.target.value)}
+                    />
+                    <button
+                      className="btn btn-update"
+                      onClick={async () => {
+                        try {
+                          await api.post(`/orders/${id}/payout`, { amount: Number(paymentUpdate) });
+                          const res = await api.get(`/orders/${id}`);
+                          setOrder(res.data);
+                          setPaymentUpdate('');
+                        } catch (err) {
+                          setError(err.response?.data?.error || 'Failed to payout');
+                        }
+                      }}
+                      disabled={!paymentUpdate}
+                    >
+                      دفع
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -391,6 +618,7 @@ const OrderManagement = () => {
                     <option value="delivered">تم التسليم</option>
                     <option value="paid">مدفوع</option>
                     <option value="cancelled">ملغي</option>
+                    <option value="returned">مرتجع</option>
                   </select>
                 </div>
                 
@@ -419,6 +647,19 @@ const OrderManagement = () => {
               </button>
             </form>
           </div>
+
+          {/* Return Information */}
+          {order.status === 'returned' && (
+            <div className="detail-section">
+              <h2><i className="fas fa-undo"></i> معلومات المرتجعات</h2>
+              <div className="return-info">
+                <div className="return-reason">
+                  <span className="label">سبب الإرجاع:</span>
+                  <span>{order.returnReason || 'غير محدد'}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Edit Form (conditionally rendered) */}
@@ -428,21 +669,60 @@ const OrderManagement = () => {
               <h2>{editMode ? 'تعديل الطلب' : 'إضافة طلب جديد'}</h2>
               <form onSubmit={handleSubmitOrder} className="order-form">
                 <div className="form-group">
-                  <label>اسم العميل</label>
+                  <label>اختيار عميل (اختياري)</label>
+                  <select
+                    value={formData.senderCustomerId || ''}
+                    onChange={handleCustomerSelect}
+                  >
+                    <option value="">إنشاء طلب جديد</option>
+                    {customers.map((customer) => (
+                      <option key={customer._id} value={customer._id}>
+                        {customer.name} - {customer.phone}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {!formData.senderCustomerId && (
+                  <>
+                    <div className="form-group">
+                      <label>اسم العميل (صاحب الشحنة)</label>
+                      <input
+                        type="text"
+                        value={formData.customerName}
+                        onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>رقم هاتف العميل (صاحب الشحنة)</label>
+                      <input
+                        type="text"
+                        value={formData.customerPhone}
+                        onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="form-group">
+                  <label>اسم المستلم</label>
                   <input
                     type="text"
-                    value={formData.customerName}
-                    onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                    value={formData.receiverName || ''}
+                    onChange={(e) => setFormData({ ...formData, receiverName: e.target.value })}
                     required
                   />
                 </div>
 
                 <div className="form-group">
-                  <label>رقم هاتف العميل</label>
+                  <label>رقم هاتف المستلم</label>
                   <input
                     type="text"
-                    value={formData.customerPhone}
-                    onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
+                    value={formData.receiverPhone || ''}
+                    onChange={(e) => setFormData({ ...formData, receiverPhone: e.target.value })}
                     required
                   />
                 </div>
@@ -546,6 +826,7 @@ const OrderManagement = () => {
             <option value="delivered">تم التسليم</option>
             <option value="paid">مدفوع</option>
             <option value="cancelled">ملغي</option>
+            <option value="returned">مرتجع</option>
           </select>
           
           <select name="driverId" value={filters.driverId} onChange={handleFilterChange}>
@@ -572,13 +853,18 @@ const OrderManagement = () => {
           setFormData({
             customerName: '',
             customerPhone: '',
+            receiverName: '',
+            receiverPhone: '',
             from: '',
             to: '',
             productDetails: '',
             pieces: '',
             weight: '',
+            productPrice: '',
+            shippingCost: '',
             price: '',
             driverId: '',
+            senderCustomerId: ''
           });
         }}
       >
@@ -588,21 +874,60 @@ const OrderManagement = () => {
       {showForm && (
         <form onSubmit={handleSubmitOrder} className="order-form">
           <div className="form-group">
-            <label>اسم العميل</label>
+            <label>اختيار عميل (اختياري)</label>
+            <select
+              value={formData.senderCustomerId || ''}
+              onChange={handleCustomerSelect}
+            >
+              <option value="">إنشاء طلب جديد</option>
+              {customers.map((customer) => (
+                <option key={customer._id} value={customer._id}>
+                  {customer.name} - {customer.phone}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {!formData.senderCustomerId && (
+            <>
+              <div className="form-group">
+                <label>اسم العميل (صاحب الشحنة)</label>
+                <input
+                  type="text"
+                  value={formData.customerName}
+                  onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>رقم هاتف العميل (صاحب الشحنة)</label>
+                <input
+                  type="text"
+                  value={formData.customerPhone}
+                  onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
+                  required
+                />
+              </div>
+            </>
+          )}
+
+          <div className="form-group">
+            <label>اسم المستلم</label>
             <input
               type="text"
-              value={formData.customerName}
-              onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+              value={formData.receiverName || ''}
+              onChange={(e) => setFormData({ ...formData, receiverName: e.target.value })}
               required
             />
           </div>
 
           <div className="form-group">
-            <label>رقم هاتف العميل</label>
+            <label>رقم هاتف المستلم</label>
             <input
               type="text"
-              value={formData.customerPhone}
-              onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
+              value={formData.receiverPhone || ''}
+              onChange={(e) => setFormData({ ...formData, receiverPhone: e.target.value })}
               required
             />
           </div>
@@ -655,14 +980,31 @@ const OrderManagement = () => {
             </div>
           </div>
 
-          <div className="form-group">
-            <label>السعر</label>
-            <input
-              type="number"
-              value={formData.price}
-              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-              required
-            />
+          <div className="form-inline">
+            <div className="form-group">
+              <label>سعر المنتج</label>
+              <input
+                type="number"
+                value={formData.productPrice}
+                onChange={(e) => setFormData({ ...formData, productPrice: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label>تكلفة الشحن</label>
+              <input
+                type="number"
+                value={formData.shippingCost}
+                onChange={(e) => setFormData({ ...formData, shippingCost: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label>الإجمالي</label>
+              <input
+                type="number"
+                value={Number(formData.productPrice || 0) + Number(formData.shippingCost || 0)}
+                readOnly
+              />
+            </div>
           </div>
 
           <div className="form-group">
@@ -691,8 +1033,8 @@ const OrderManagement = () => {
           <thead>
             <tr>
               <th>رقم الطلب</th>
-              <th>العميل</th>
-              <th>الهاتف</th>
+              <th>صاحب الشحنة</th>
+              <th>المستلم</th>
               <th>من</th>
               <th>إلى</th>
               <th>السعر</th>
@@ -706,8 +1048,12 @@ const OrderManagement = () => {
             {orders.map((order) => (
               <tr key={order._id}>
                 <td>{order.orderNumber}</td>
-                <td>{order.customerName}</td>
-                <td>{order.customerPhone}</td>
+                <td>
+                  {order.senderCustomer 
+                    ? order.senderCustomer.name 
+                    : order.customerName}
+                </td>
+                <td>{order.receiverName}</td>
                 <td>{order.from}</td>
                 <td>{order.to}</td>
                 <td>{order.price} EG</td>
@@ -745,6 +1091,12 @@ const OrderManagement = () => {
                     onClick={() => handleEdit(order)}
                   >
                     تعديل
+                  </button>
+                  <button
+                    className="btn btn-print"
+                    onClick={() => printWaybill(order)}
+                  >
+                    طباعة بوليصة الشحن
                   </button>
                 </td>
               </tr>

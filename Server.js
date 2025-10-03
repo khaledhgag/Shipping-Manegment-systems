@@ -14,6 +14,7 @@ const UserRoutes = require("./Routes/UserRoutes");
 const DriverRoutes = require("./Routes/DriveRoutes"); // ✅ إضافة مسارات السائقين
 const PaymentRoutes = require("./Routes/PaymentRoutes");
 const ReportRoutes = require("./Routes/ReportRoutes");
+const CustomerRoutes =require("./Routes/CustomerRoutes")
 //express app
 const app = express();//midileware
 app.use(cors({ origin: "http://localhost:3000", credentials: true }));app.use(express.json());
@@ -31,6 +32,8 @@ app.use("/api/v1/users", UserRoutes);
 app.use("/api/v1/drivers", DriverRoutes); // ✅ إضافة مسارات السائقين
 app.use("/api/v1/payments", PaymentRoutes);
 app.use("/api/v1/reports", ReportRoutes);
+app.use("/api/v1/customers", CustomerRoutes);
+
 
 
 const Port = process.env.Port || 8000;

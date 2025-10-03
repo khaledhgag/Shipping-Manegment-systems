@@ -1,3 +1,4 @@
+// src/Components/admin/ReportMangment.js
 import React, { useState, useEffect } from 'react';
 import {
   Card,
@@ -31,7 +32,10 @@ import {
   AttachMoney,
   TrendingUp,
   TrendingDown,
-  FilterList
+  FilterList,
+  Person,
+  AccountBalanceWallet,
+  Undo
 } from '@mui/icons-material';
 import api from '../../Services/api';
 
@@ -86,6 +90,9 @@ function ReportManagement() {
   const [employees, setEmployees] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [revenue, setRevenue] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [pendingPayments, setPendingPayments] = useState([]);
+  const [returnedOrders, setReturnedOrders] = useState([]);
   const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState({
@@ -95,7 +102,10 @@ function ReportManagement() {
     totalRevenue: 0,
     totalEmployees: 0,
     totalDrivers: 0,
-    activeDrivers: 0
+    activeDrivers: 0,
+    totalCustomers: 0,
+    pendingPaymentCustomers: 0,
+    returnedOrdersCount: 0
   });
 
   useEffect(() => {
@@ -105,17 +115,27 @@ function ReportManagement() {
   const fetchReports = async () => {
     setLoading(true);
     try {
-      const [o, e, d, r] = await Promise.all([
+      const [o, e, d, r, c, pp, ro] = await Promise.all([
         api.get('/reports/orders'),
         api.get('/reports/employees'),
         api.get('/reports/drivers'),
-        api.get('/reports/revenue')
+        api.get('/reports/revenue'),
+        api.get('/reports/customers'),
+        api.get('/reports/pending-payments'),
+        api.get('/reports/returned-orders')
       ]);
-      
+          // أضف هذه السطور لتصحيح البيانات
+    console.log('Customers report data:', c.data);
+    console.log('Pending payments data:', pp.data);
+    console.log('Returned orders data:', ro.data);
+    
       setOrders(o.data);
       setEmployees(e.data);
       setDrivers(d.data);
       setRevenue(r.data);
+      setCustomers(c.data);
+      setPendingPayments(pp.data);
+      setReturnedOrders(ro.data);
       
       // Calculate summary statistics
       const totalOrders = o.data.length;
@@ -125,6 +145,9 @@ function ReportManagement() {
       const totalEmployees = e.data.length;
       const totalDrivers = d.data.length;
       const activeDrivers = d.data.filter(driver => driver.totalOrders > 0).length;
+      const totalCustomers = c.data.length;
+      const pendingPaymentCustomers = pp.data.length;
+      const returnedOrdersCount = ro.data.length;
       
       setSummary({
         totalOrders,
@@ -133,7 +156,10 @@ function ReportManagement() {
         totalRevenue,
         totalEmployees,
         totalDrivers,
-        activeDrivers
+        activeDrivers,
+        totalCustomers,
+        pendingPaymentCustomers,
+        returnedOrdersCount
       });
     } catch (error) {
       console.error('Error fetching reports:', error);
@@ -231,19 +257,19 @@ function ReportManagement() {
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <SummaryCard
-            title="Employees"
-            value={summary.totalEmployees}
-            icon={<People />}
+            title="Customers"
+            value={summary.totalCustomers}
+            icon={<Person />}
             color="info"
+            subtitle={`${summary.pendingPaymentCustomers} with pending payments`}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <SummaryCard
-            title="Drivers"
-            value={`${summary.activeDrivers}/${summary.totalDrivers}`}
-            icon={<DirectionsBike />}
+            title="Returned Orders"
+            value={summary.returnedOrdersCount}
+            icon={<Undo />}
             color="warning"
-            subtitle="Active/Total"
           />
         </Grid>
       </Grid>
@@ -306,6 +332,9 @@ function ReportManagement() {
         <Tab label="Orders Report" />
         <Tab label="Employees Report" />
         <Tab label="Drivers Report" />
+        <Tab label="Customers Report" />
+        <Tab label="Pending Payments" />
+        <Tab label="Returned Orders" />
         <Tab label="Revenue Report" />
       </Tabs>
 
@@ -326,7 +355,8 @@ function ReportManagement() {
                     <TableHead>
                       <TableRow>
                         <TableCell>Order #</TableCell>
-                        <TableCell>Customer</TableCell>
+                        <TableCell>Sender</TableCell>
+                        <TableCell>Receiver</TableCell>
                         <TableCell>Route</TableCell>
                         <TableCell>Price</TableCell>
                         <TableCell>Status</TableCell>
@@ -340,7 +370,12 @@ function ReportManagement() {
                       {orders.length > 0 ? orders.map((o, i) => (
                         <TableRow key={i}>
                           <TableCell>{o.orderNumber}</TableCell>
-                          <TableCell>{o.customerName}</TableCell>
+                          <TableCell>
+                            {o.senderCustomer 
+                              ? o.senderCustomer.name 
+                              : o.customerName}
+                          </TableCell>
+                          <TableCell>{o.receiverName}</TableCell>
                           <TableCell>{o.from} → {o.to}</TableCell>
                           <TableCell>EGP {o.price}</TableCell>
                           <TableCell>
@@ -355,7 +390,7 @@ function ReportManagement() {
                         </TableRow>
                       )) : (
                         <TableRow>
-                          <TableCell colSpan={9} align="center">
+                          <TableCell colSpan={10} align="center">
                             No orders found
                           </TableCell>
                         </TableRow>
@@ -484,6 +519,144 @@ function ReportManagement() {
           )}
 
           {tab === 3 && (
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Customers Report
+                </Typography>
+                <TableContainer component={Paper}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Name</TableCell>
+                        <TableCell>Phone</TableCell>
+                        <TableCell>Email</TableCell>
+                        <TableCell>Total Orders</TableCell>
+                        <TableCell>Total Value</TableCell>
+                        <TableCell>Pending Payments</TableCell>
+                        <TableCell>Returned Orders</TableCell>
+                        <TableCell>Registration Date</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {customers.length > 0 ? customers.map((c, i) => (
+                        <TableRow key={i}>
+                          <TableCell>{c.name}</TableCell>
+                          <TableCell>{c.phone}</TableCell>
+                          <TableCell>{c.email || 'N/A'}</TableCell>
+                          <TableCell>{c.totalOrders}</TableCell>
+                          <TableCell>EGP {c.totalValue}</TableCell>
+                          <TableCell sx={{ color: c.pendingPayments > 0 ? 'error.main' : 'inherit' }}>
+                            EGP {c.pendingPayments}
+                          </TableCell>
+                          <TableCell>{c.returnedOrders}</TableCell>
+                          <TableCell>{new Date(c.createdAt).toLocaleDateString()}</TableCell>
+                        </TableRow>
+                      )) : (
+                        <TableRow>
+                          <TableCell colSpan={9} align="center">
+                            No customers found
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {tab === 4 && (
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Customers with Pending Payments
+                </Typography>
+                <TableContainer component={Paper}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Name</TableCell>
+                        <TableCell>Phone</TableCell>
+                        <TableCell>Email</TableCell>
+                        <TableCell>Total Orders</TableCell>
+                        <TableCell>Pending Amount</TableCell>
+                        <TableCell>Registration Date</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {pendingPayments.length > 0 ? pendingPayments.map((c, i) => (
+                        <TableRow key={i}>
+                          <TableCell>{c.name}</TableCell>
+                          <TableCell>{c.phone}</TableCell>
+                          <TableCell>{c.email || 'N/A'}</TableCell>
+                          <TableCell>{c.totalOrders}</TableCell>
+                          <TableCell sx={{ color: 'error.main', fontWeight: 'bold' }}>
+                            EGP {c.pendingPayments}
+                          </TableCell>
+                          <TableCell>{new Date(c.createdAt).toLocaleDateString()}</TableCell>
+                        </TableRow>
+                      )) : (
+                        <TableRow>
+                          <TableCell colSpan={6} align="center">
+                            No customers with pending payments
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {tab === 5 && (
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Returned Orders Report
+                </Typography>
+                <TableContainer component={Paper}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Order #</TableCell>
+                        <TableCell>Sender Customer</TableCell>
+                        <TableCell>Receiver</TableCell>
+                        <TableCell>Price</TableCell>
+                        <TableCell>Return Reason</TableCell>
+                        <TableCell>Return Date</TableCell>
+                        <TableCell>Driver</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {returnedOrders.length > 0 ? returnedOrders.map((o, i) => (
+                        <TableRow key={i}>
+                          <TableCell>{o.orderNumber}</TableCell>
+                          <TableCell>
+                            {o.senderCustomer ? o.senderCustomer.name : o.customerName}
+                          </TableCell>
+                          <TableCell>{o.receiverName}</TableCell>
+                          <TableCell>EGP {o.price}</TableCell>
+                          <TableCell>{o.returnReason || 'N/A'}</TableCell>
+                          <TableCell>{new Date(o.updatedAt).toLocaleDateString()}</TableCell>
+                          <TableCell>{o.assignedDriver ? o.assignedDriver.name : 'N/A'}</TableCell>
+                        </TableRow>
+                      )) : (
+                        <TableRow>
+                          <TableCell colSpan={8} align="center">
+                            No returned orders found
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {tab === 6 && (
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>

@@ -6,7 +6,6 @@ import Login from './Components/Pages/Login';
 import AdminDashboard from './Components/Pages/AdminDashboard';
 import EmployeeDashboard from './Components/Pages/EmployeeDashboard';
 import OrderDetails from './Components/admin/OrderMangment';
-
 import './styles/app.css';
 
 
@@ -17,6 +16,10 @@ const AdminOrderManagement = React.lazy(() => import('./Components/admin/OrderMa
 const AdminPaymentManagement = React.lazy(() => import('./Components/admin/PaymentMngment'));
 const AdminReports = React.lazy(() => import('./Components/admin/ReportMangment'));
 const AdminDashboardHome = React.lazy(() => import('./Components/admin/Dashboardhome'));
+const CustomerManagement = React.lazy(() => import('./Components/admin/CustomerMangment'));
+
+
+
 
 // مكونات الموظف
 const EmployeeOrderManagement = React.lazy(() => import('./Components/employee/OrderMangment'));
@@ -42,6 +45,8 @@ function App() {
                   <Route path="drivers" element={<AdminDriverManagement />} />
                   <Route path="orders" element={<AdminOrderManagement />} />
                   <Route path="payments" element={<AdminPaymentManagement />} />
+                  <Route path="customers" element={< CustomerManagement/>} />
+                  <Route path="customers/:id" element={<CustomerManagement />} />
                   <Route path="reports" element={<AdminReports />} />
                 </Route>
               </Route>

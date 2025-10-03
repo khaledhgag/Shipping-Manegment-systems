@@ -7,7 +7,8 @@ const {
   getOrders,
   assignDriver,
   addTrackingUpdate,
-  getOrderById
+  getOrderById,
+  refundOrder
 } = require('../services/OrderService');
 
 const { authMiddleware, requireRole } = require('../Midlleware/authMiddleware');
@@ -37,5 +38,14 @@ router.get('/', authMiddleware, requireRole(['admin']), getOrders);
 
 // إضافة تحديث تتبع
 router.post('/:id/tracking', authMiddleware, requireRole(['employee', 'admin']), addTrackingUpdate);
+
+// رد المبلغ للعميل
+router.post('/:id/refund', authMiddleware, requireRole(['admin']), refundOrder);
+
+// دفع للعميل صاحب الشحنة
+router.post('/:id/payout', authMiddleware, requireRole(['admin']), require('../services/OrderService').payoutToSender);
+
+// تسوية المرتجع لصالح العميل
+router.post('/:id/settle-return', authMiddleware, requireRole(['admin']), require('../services/OrderService').settleReturnToCustomer);
 
 module.exports = router;
